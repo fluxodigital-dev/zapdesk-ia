@@ -9,16 +9,13 @@ const UnifiedChat = ({ user }) => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [aiSuggestions, setAiSuggestions] = useState([]);
-  const [showVarinha, setShowVarinha] = useState(false);
-  const [varinhaText, setVarinhaText] = useState('');
 
-  // ✅ Função Kanban
+  // Mover para Kanban (placeholder)
   const moveToKanban = (chat) => {
     console.log('Movendo para Kanban:', chat);
   };
 
-  // ✅ Carregar conversas
+  // Carregar conversas
   const loadConversations = async () => {
     try {
       const res = await fetch(`/api/conversations/${user.id}`);
@@ -29,7 +26,7 @@ const UnifiedChat = ({ user }) => {
     }
   };
 
-  // ✅ Atualizar lista
+  // Atualizar lista de conversas
   const updateConversationList = (message) => {
     setConversations(prev => {
       const existing = prev.find(c => c.contactId === message.contactId);
@@ -37,7 +34,7 @@ const UnifiedChat = ({ user }) => {
       if (existing) {
         return prev.map(c =>
           c.contactId === message.contactId
-            ? { ...c, lastMessage: message.content, unread: (c.unread || 0) + 1 }
+            ? { ...c, lastMessage: message.content }
             : c
         );
       }
@@ -48,29 +45,24 @@ const UnifiedChat = ({ user }) => {
           name: message.contactName,
           platform: message.platform,
           lastMessage: message.content,
-          unread: 1,
-          avatar: message.profilePic
         },
         ...prev
       ];
     });
   };
 
-  // ✅ useEffect CORRIGIDO
+  // useEffect LIMPO (sem warning)
   useEffect(() => {
     if (!user?.id) return;
 
     socketRef.current = io(process.env.REACT_APP_API_URL);
+
     socketRef.current.emit('join', user.id);
 
     socketRef.current.on('new:message', (data) => {
-      setMessages(prev => {
-        if (selectedChat?.contactId === data.contactId) {
-          return [...prev, data];
-        }
-        return prev;
-      });
-
+      if (selectedChat?.contactId === data.contactId) {
+        setMessages(prev => [...prev, data]);
+      }
       updateConversationList(data);
     });
 
@@ -81,9 +73,9 @@ const UnifiedChat = ({ user }) => {
         socketRef.current.disconnect();
       }
     };
-  }, [user.id]); // ✅ corrigido
+  }, [user?.id]); // ✅ corrigido
 
-  // ✅ Selecionar conversa
+  // Selecionar conversa
   const selectConversation = async (conv) => {
     setSelectedChat(conv);
 
@@ -91,29 +83,12 @@ const UnifiedChat = ({ user }) => {
       const res = await fetch(`/api/messages/${user.id}/${conv.contactId}`);
       const data = await res.json();
       setMessages(data);
-      generateAiSuggestions(data);
     } catch (err) {
       console.error('Erro ao carregar mensagens:', err);
     }
   };
 
-  // ✅ IA sugestões
-  const generateAiSuggestions = async (chatHistory) => {
-    try {
-      const res = await fetch('/api/ai/suggestions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history: chatHistory, niche: user.niche })
-      });
-
-      const data = await res.json();
-      setAiSuggestions(data.suggestions || []);
-    } catch (err) {
-      console.error('Erro IA sugestões:', err);
-    }
-  };
-
-  // ✅ Enviar mensagem
+  // Enviar mensagem
   const sendMessage = async () => {
     if (!inputText.trim() || !selectedChat) return;
 
@@ -123,80 +98,67 @@ const UnifiedChat = ({ user }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
-          platform: selectedChat.platform,
           to: selectedChat.contactId,
           content: inputText,
-          humanize: true
-        })
+        }),
       });
 
       setInputText('');
-      setAiSuggestions([]);
     } catch (err) {
       console.error('Erro ao enviar mensagem:', err);
     }
   };
 
-  // ✅ IA resposta
-  const aiReply = async () => {
-    try {
-      const res = await fetch('/api/ai/reply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          history: messages,
-          niche: user.niche,
-          tone: 'friendly'
-        })
-      });
-
-      const data = await res.json();
-      setInputText(data.reply);
-    } catch (err) {
-      console.error('Erro IA reply:', err);
-    }
-  };
-
   return (
     <div className="unified-chat">
+      
+      {/* SIDEBAR */}
       <div className="chat-sidebar">
-        <div className="conversations-list">
-          {conversations.map(conv => (
-            <div
-              key={conv.contactId}
-              className={`conversation-item ${selectedChat?.contactId === conv.contactId ? 'active' : ''}`}
-              onClick={() => selectConversation(conv)}
-            >
-              <span>{conv.name}</span>
-              <p>{conv.lastMessage}</p>
-            </div>
-          ))}
-        </div>
+        {conversations.map(conv => (
+          <div
+            key={conv.contactId}
+            className={`conversation-item ${
+              selectedChat?.contactId === conv.contactId ? 'active' : ''
+            }`}
+            onClick={() => selectConversation(conv)}
+          >
+            <strong>{conv.name}</strong>
+            <p>{conv.lastMessage}</p>
+          </div>
+        ))}
       </div>
 
+      {/* CHAT */}
       <div className="chat-main">
         {selectedChat ? (
           <>
             <div className="chat-header">
               <h3>{selectedChat.name}</h3>
-              <button onClick={() => moveToKanban(selectedChat)}>Mover para Kanban</button>
-              <button onClick={aiReply}>IA Responder</button>
+
+              <button onClick={() => moveToKanban(selectedChat)}>
+                📋 Mover para Kanban
+              </button>
             </div>
 
             <div className="messages-container">
               {messages.map(msg => (
-                <div key={msg.messageId}>
+                <div key={msg.messageId} className="message">
                   {msg.content}
                 </div>
               ))}
             </div>
 
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-            />
+            <div className="chat-input">
+              <input
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Digite sua mensagem..."
+              />
 
-            <button onClick={sendMessage}>Enviar</button>
+              <button onClick={sendMessage}>
+                Enviar
+              </button>
+            </div>
           </>
         ) : (
           <p>Selecione uma conversa</p>
