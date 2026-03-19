@@ -10,72 +10,65 @@ const UnifiedChat = ({ user }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
 
-  // Mover para Kanban (placeholder)
   const moveToKanban = (chat) => {
     console.log('Movendo para Kanban:', chat);
   };
 
-  // Carregar conversas
-  const loadConversations = async () => {
-    try {
-      const res = await fetch(`/api/conversations/${user.id}`);
-      const data = await res.json();
-      setConversations(data);
-    } catch (err) {
-      console.error('Erro ao carregar conversas:', err);
-    }
-  };
-
-  // Atualizar lista de conversas
-  const updateConversationList = (message) => {
-    setConversations(prev => {
-      const existing = prev.find(c => c.contactId === message.contactId);
-
-      if (existing) {
-        return prev.map(c =>
-          c.contactId === message.contactId
-            ? { ...c, lastMessage: message.content }
-            : c
-        );
-      }
-
-      return [
-        {
-          contactId: message.contactId,
-          name: message.contactName,
-          platform: message.platform,
-          lastMessage: message.content,
-        },
-        ...prev
-      ];
-    });
-  };
-
-  // useEffect LIMPO (sem warning)
   useEffect(() => {
     if (!user?.id) return;
 
-    socketRef.current = io(process.env.REACT_APP_API_URL);
+    const socket = io(process.env.REACT_APP_API_URL);
+    socketRef.current = socket;
 
-    socketRef.current.emit('join', user.id);
+    socket.emit('join', user.id);
 
-    socketRef.current.on('new:message', (data) => {
-      if (selectedChat?.contactId === data.contactId) {
-        setMessages(prev => [...prev, data]);
-      }
-      updateConversationList(data);
+    socket.on('new:message', (data) => {
+      setMessages(prev => {
+        if (selectedChat?.contactId === data.contactId) {
+          return [...prev, data];
+        }
+        return prev;
+      });
+
+      setConversations(prev => {
+        const existing = prev.find(c => c.contactId === data.contactId);
+
+        if (existing) {
+          return prev.map(c =>
+            c.contactId === data.contactId
+              ? { ...c, lastMessage: data.content }
+              : c
+          );
+        }
+
+        return [
+          {
+            contactId: data.contactId,
+            name: data.contactName,
+            platform: data.platform,
+            lastMessage: data.content,
+          },
+          ...prev
+        ];
+      });
     });
 
-    loadConversations();
-
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
+    // carregar conversas
+    const fetchConversations = async () => {
+      try {
+        const res = await fetch(`/api/conversations/${user.id}`);
+        const data = await res.json();
+        setConversations(data);
+      } catch (err) {
+        console.error(err);
       }
     };
-  }, [user?.id]); // ✅ corrigido
 
-  // Selecionar conversa
+    fetchConversations();
+
+    return () => socket.disconnect();
+  }, [user?.id, selectedChat?.contactId]);
+
   const selectConversation = async (conv) => {
     setSelectedChat(conv);
 
@@ -84,11 +77,10 @@ const UnifiedChat = ({ user }) => {
       const data = await res.json();
       setMessages(data);
     } catch (err) {
-      console.error('Erro ao carregar mensagens:', err);
+      console.error(err);
     }
   };
 
-  // Enviar mensagem
   const sendMessage = async () => {
     if (!inputText.trim() || !selectedChat) return;
 
@@ -105,14 +97,12 @@ const UnifiedChat = ({ user }) => {
 
       setInputText('');
     } catch (err) {
-      console.error('Erro ao enviar mensagem:', err);
+      console.error(err);
     }
   };
 
   return (
     <div className="unified-chat">
-      
-      {/* SIDEBAR */}
       <div className="chat-sidebar">
         {conversations.map(conv => (
           <div
@@ -128,13 +118,11 @@ const UnifiedChat = ({ user }) => {
         ))}
       </div>
 
-      {/* CHAT */}
       <div className="chat-main">
         {selectedChat ? (
           <>
             <div className="chat-header">
               <h3>{selectedChat.name}</h3>
-
               <button onClick={() => moveToKanban(selectedChat)}>
                 📋 Mover para Kanban
               </button>
@@ -154,10 +142,7 @@ const UnifiedChat = ({ user }) => {
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Digite sua mensagem..."
               />
-
-              <button onClick={sendMessage}>
-                Enviar
-              </button>
+              <button onClick={sendMessage}>Enviar</button>
             </div>
           </>
         ) : (
