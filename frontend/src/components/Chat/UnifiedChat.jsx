@@ -4,6 +4,16 @@ import { io } from 'socket.io-client';
 import './UnifiedChat.css';
 
 const UnifiedChat = ({ user }) => {
+const moveToKanban = (chat) => {
+  console.log('Movendo para Kanban:', chat);
+
+  // exemplo futuro (opcional)
+  // fetch('/api/move-to-kanban', {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify({ chat })
+  // });
+};
   const [conversations, setConversations] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
